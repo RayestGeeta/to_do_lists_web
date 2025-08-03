@@ -8,6 +8,37 @@ const clearCompletedButton = document.getElementById('clear-completed');
 
 // 待办事项数组
 let todos = JSON.parse(localStorage.getItem('todos')) || [];
+todos = todos.map(todo => ({
+    ...todo,
+    dueDate: todo.dueDate || '',
+    priority: todo.priority || 'medium',
+    tags: todo.tags || []
+}));
+saveTodos();
+let searchTerm = '';
+let language = 'zh';
+const translations = {
+    zh: {
+        title: '待办事项清单',
+        placeholder: '添加新的待办事项...',
+        all: '全部',
+        active: '未完成',
+        completed: '已完成',
+        clear: '清除已完成',
+        itemsLeft: '项待办',
+        footer: '双击待办事项可以编辑 | 拖动可以重新排序 | 支持日期、优先级、标签'
+    },
+    en: {
+        title: 'To-Do List',
+        placeholder: 'Add new todo...',
+        all: 'All',
+        active: 'Active',
+        completed: 'Completed',
+        clear: 'Clear completed',
+        itemsLeft: 'items left',
+        footer: 'Double-click to edit | Drag to reorder | Supports date, priority, tags'
+    }
+};
 
 // 当前过滤状态
 let currentFilter = 'all';
@@ -16,27 +47,73 @@ let currentFilter = 'all';
 function init() {
     renderTodos();
     updateItemsCount();
+    updateLanguage();
     
-    // 添加事件监听器
     addButton.addEventListener('click', addTodo);
-    todoInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addTodo();
-    });
+    todoInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addTodo(); });
     todoList.addEventListener('click', handleTodoClick);
     todoList.addEventListener('dblclick', handleTodoDblClick);
+    filters.forEach(filter => { filter.addEventListener('click', () => setFilter(filter.dataset.filter)); });
+    clearCompletedButton.addEventListener('click', clearCompleted);
+    enableDragAndDrop();
     
-    // 过滤器事件
-    filters.forEach(filter => {
-        filter.addEventListener('click', () => {
-            setFilter(filter.dataset.filter);
-        });
+    // New features
+    const searchInput = document.getElementById('search-input');
+    searchInput.addEventListener('input', (e) => {
+        searchTerm = e.target.value.toLowerCase();
+        renderTodos();
     });
     
-    // 清除已完成事项
-    clearCompletedButton.addEventListener('click', clearCompleted);
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    darkModeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark');
+        document.querySelector('.container').classList.toggle('dark');
+    });
     
-    // 启用拖拽功能
-    enableDragAndDrop();
+    const languageSelect = document.getElementById('language-select');
+    languageSelect.addEventListener('change', (e) => {
+        language = e.target.value;
+        updateLanguage();
+        renderTodos();
+    });
+    
+    const syncButton = document.getElementById('sync-button');
+    syncButton.addEventListener('click', syncToCloud);
+}
+
+function updateLanguage() {
+    const trans = translations[language];
+    document.querySelector('h1').textContent = trans.title;
+    todoInput.placeholder = trans.placeholder;
+    filters[0].textContent = trans.all;
+    filters[1].textContent = trans.active;
+    filters[2].textContent = trans.completed;
+    clearCompletedButton.textContent = trans.clear;
+    itemsLeft.textContent = `0 ${trans.itemsLeft}`;
+    document.querySelector('footer p').textContent = trans.footer;
+}
+
+async function syncToCloud() {
+    try {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const userDoc = doc(db, 'users', user.uid);
+        await setDoc(userDoc, { todos });
+        alert('Synced successfully!');
+        // Listen for changes
+        onSnapshot(userDoc, (doc) => {
+            if (doc.exists()) {
+                todos = doc.data().todos || [];
+                saveTodos();
+                renderTodos();
+                updateItemsCount();
+            }
+        });
+    } catch (error) {
+        console.error('Sync error:', error);
+        alert('Sync failed: ' + error.message);
+    }
 }
 
 // 渲染待办事项列表
@@ -53,7 +130,19 @@ function renderTodos() {
         
         li.innerHTML = `
             <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''}>
-            <input type="text" class="todo-text" value="${todo.text}" readonly>
+            <div class="todo-content">
+                <input type="text" class="todo-text" value="${todo.text}" readonly>
+                <input type="datetime-local" class="todo-due" value="${todo.dueDate}" style="display:none;">
+                <select class="todo-priority" style="display:none;">
+                    <option value="high" ${todo.priority === 'high' ? 'selected' : ''}>High</option>
+                    <option value="medium" ${todo.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                    <option value="low" ${todo.priority === 'low' ? 'selected' : ''}>Low</option>
+                </select>
+                <input type="text" class="todo-tags" value="${todo.tags.join(', ')}" placeholder="Tags" style="display:none;">
+                <span class="todo-display-due">${todo.dueDate ? new Date(todo.dueDate).toLocaleString() : ''}</span>
+                <span class="todo-display-priority ${todo.priority}">${todo.priority}</span>
+                <span class="todo-display-tags">${todo.tags.join(', ')}</span>
+            </div>
             <div class="todo-actions">
                 <button class="todo-edit"><i class="fas fa-edit"></i></button>
                 <button class="todo-delete"><i class="fas fa-trash-alt"></i></button>
@@ -66,14 +155,22 @@ function renderTodos() {
 
 // 过滤待办事项
 function filterTodos() {
+    let filtered = todos;
     switch(currentFilter) {
         case 'active':
-            return todos.filter(todo => !todo.completed);
+            filtered = filtered.filter(todo => !todo.completed);
+            break;
         case 'completed':
-            return todos.filter(todo => todo.completed);
-        default:
-            return todos;
+            filtered = filtered.filter(todo => todo.completed);
+            break;
     }
+    if (searchTerm) {
+        filtered = filtered.filter(todo => 
+            todo.text.toLowerCase().includes(searchTerm) ||
+            todo.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+        );
+    }
+    return filtered;
 }
 
 // 设置过滤器
@@ -100,7 +197,10 @@ function addTodo() {
         const newTodo = {
             id: Date.now().toString(),
             text: text,
-            completed: false
+            completed: false,
+            dueDate: '',
+            priority: 'medium',
+            tags: []
         };
         
         todos.push(newTodo);
@@ -155,27 +255,57 @@ function handleTodoDblClick(e) {
 // 开始编辑待办事项
 function startEditing(item) {
     const textInput = item.querySelector('.todo-text');
+    const dueInput = item.querySelector('.todo-due');
+    const prioritySelect = item.querySelector('.todo-priority');
+    const tagsInput = item.querySelector('.todo-tags');
     item.classList.add('editing');
     textInput.readOnly = false;
+    dueInput.style.display = 'inline';
+    prioritySelect.style.display = 'inline';
+    tagsInput.style.display = 'inline';
     textInput.focus();
-    
-    // 将光标移到文本末尾
     const length = textInput.value.length;
     textInput.setSelectionRange(length, length);
-    
-    // 添加失去焦点和按键事件
-    textInput.addEventListener('blur', () => finishEditing(item), { once: true });
-    textInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            textInput.blur();
-        }
-    });
-    textInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            textInput.value = todos.find(t => t.id === item.dataset.id).text;
-            textInput.blur();
-        }
-    });
+    const finishEdit = () => finishEditing(item);
+    textInput.addEventListener('blur', finishEdit, { once: true });
+    dueInput.addEventListener('blur', finishEdit, { once: true });
+    prioritySelect.addEventListener('blur', finishEdit, { once: true });
+    tagsInput.addEventListener('blur', finishEdit, { once: true });
+    textInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') textInput.blur(); });
+    // Similar for others if needed
+}
+function finishEditing(item) {
+    const textInput = item.querySelector('.todo-text');
+    const dueInput = item.querySelector('.todo-due');
+    const prioritySelect = item.querySelector('.todo-priority');
+    const tagsInput = item.querySelector('.todo-tags');
+    const displayDue = item.querySelector('.todo-display-due');
+    const displayPriority = item.querySelector('.todo-display-priority');
+    const displayTags = item.querySelector('.todo-display-tags');
+    item.classList.remove('editing');
+    textInput.readOnly = true;
+    dueInput.style.display = 'none';
+    prioritySelect.style.display = 'none';
+    tagsInput.style.display = 'none';
+    const id = item.dataset.id;
+    const todo = todos.find(t => t.id === id);
+    const newText = textInput.value.trim();
+    if (newText) {
+        todo.text = newText;
+        todo.dueDate = dueInput.value;
+        todo.priority = prioritySelect.value;
+        todo.tags = tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag);
+        displayDue.textContent = todo.dueDate ? new Date(todo.dueDate).toLocaleString() : '';
+        displayPriority.textContent = todo.priority;
+        displayPriority.className = `todo-display-priority ${todo.priority}`;
+        displayTags.textContent = todo.tags.join(', ');
+        saveTodos();
+    } else {
+        todos = todos.filter(t => t.id !== id);
+        saveTodos();
+        renderTodos();
+        updateItemsCount();
+    }
 }
 
 // 完成编辑待办事项
@@ -211,7 +341,8 @@ function clearCompleted() {
 // 更新剩余待办事项计数
 function updateItemsCount() {
     const activeCount = todos.filter(todo => !todo.completed).length;
-    itemsLeft.textContent = `${activeCount} 项待办`;
+    const trans = translations[language];
+    itemsLeft.textContent = `${activeCount} ${trans.itemsLeft}`;
 }
 
 // 保存待办事项到本地存储

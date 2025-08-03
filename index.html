@@ -21,6 +21,17 @@
             <input type="text" id="todo-input" placeholder="添加新的待办事项..." autofocus>
             <button id="add-button"><i class="fas fa-plus"></i></button>
         </div>
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="搜索待办事项...">
+        </div>
+        <div class="settings-container">
+            <button id="dark-mode-toggle">切换黑暗模式</button>
+            <select id="language-select">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+            </select>
+            <button id="sync-button">同步到云端</button>
+        </div>
         
         <div class="filter-container">
             <div class="filters">
@@ -41,9 +52,26 @@
     </div>
     
     <footer>
-        <p>双击待办事项可以编辑 | 拖动可以重新排序</p>
+        <p>双击待办事项可以编辑 | 拖动可以重新排序 | 支持日期、优先级、标签</p>
     </footer>
     
-    <script src="app.js"></script>
+    <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+    import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    // Your Firebase config here
+    const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY',
+        authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
+        projectId: 'YOUR_PROJECT_ID',
+        storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+        messagingSenderId: 'YOUR_SENDER_ID',
+        appId: 'YOUR_APP_ID'
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+</script>
+<script src="app.js"></script>
 </body>
 </html>

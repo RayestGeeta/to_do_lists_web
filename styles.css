@@ -15,6 +15,15 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    transition: background 0.3s, color 0.3s;
+}
+body.dark {
+    background: linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%);
+    color: #f0f0f0;
+}
+.container.dark {
+    background-color: #333;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .container {
@@ -67,6 +76,34 @@ header h1 {
     border-radius: 0 4px 4px 0;
     cursor: pointer;
     transition: background 0.3s;
+}
+.search-container {
+    padding: 10px 15px;
+}
+#search-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+.settings-container {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 15px;
+    border-top: 1px solid #e6e6e6;
+}
+#dark-mode-toggle, #sync-button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+#language-select {
+    padding: 8px;
+    border-radius: 4px;
 }
 
 #add-button:hover {
@@ -173,13 +210,41 @@ header h1 {
     transform: translate(-50%, -50%);
 }
 
-.todo-text {
+.todo-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.todo-text {
     font-size: 16px;
     padding: 5px 0;
     border: none;
     background: transparent;
     outline: none;
+}
+.todo-display-due, .todo-display-tags {
+    font-size: 12px;
+    color: #888;
+}
+.todo-display-priority {
+    font-size: 12px;
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+.todo-display-priority.high {
+    background: #ff6b6b;
+    color: white;
+}
+.todo-display-priority.medium {
+    background: #ffd93d;
+    color: black;
+}
+.todo-display-priority.low {
+    background: #4caf50;
+    color: white;
+}
+.todo-due, .todo-priority, .todo-tags {
+    margin-top: 5px;
 }
 
 .todo-actions {
