@@ -26,7 +26,16 @@ const translations = {
         completed: '已完成',
         clear: '清除已完成',
         itemsLeft: '项待办',
-        footer: '双击待办事项可以编辑 | 拖动可以重新排序 | 支持日期、优先级、标签'
+        footer: '双击待办事项可以编辑 | 拖动可以重新排序 | 支持日期、优先级、标签',
+        syncToCloud: '同步到云端',
+        loggedIn: '已登录',
+        syncSuccess: '同步成功',
+        syncFailed: '同步失败',
+        loggedOut: '已退出登录',
+        logoutFailed: '退出登录失败',
+        loginToSync: '登录以同步',
+        syncInProgress: '正在同步...',
+        logout: '退出登录'
     },
     en: {
         title: 'To-Do List',
@@ -36,7 +45,16 @@ const translations = {
         completed: 'Completed',
         clear: 'Clear completed',
         itemsLeft: 'items left',
-        footer: 'Double-click to edit | Drag to reorder | Supports date, priority, tags'
+        footer: 'Double-click to edit | Drag to reorder | Supports date, priority, tags',
+        syncToCloud: 'Sync to Cloud',
+        loggedIn: 'Logged In',
+        syncSuccess: 'Sync successful',
+        syncFailed: 'Sync failed',
+        loggedOut: 'Logged out',
+        logoutFailed: 'Logout failed',
+        loginToSync: 'Login to sync',
+        syncInProgress: 'Syncing...',
+        logout: 'Logout'
     }
 };
 
@@ -77,8 +95,101 @@ function init() {
         renderTodos();
     });
     
+    // 云同步功能
     const syncButton = document.getElementById('sync-button');
-    syncButton.addEventListener('click', syncToCloud);
+    syncButton.addEventListener('click', handleSyncButtonClick);
+    
+    // 检查是否已经登录
+    checkAuthState();
+    
+    // 添加自动同步功能
+    setupAutoSync();
+}
+
+// 处理同步按钮点击
+function handleSyncButtonClick() {
+    if (isLoggedIn) {
+        // 如果已登录，显示下拉菜单
+        const syncMenu = document.createElement('div');
+        syncMenu.className = 'sync-menu';
+        syncMenu.innerHTML = `
+            <div class="sync-menu-item sync-now">${translations[language].syncToCloud}</div>
+            <div class="sync-menu-item logout">${translations[language].logout}</div>
+        `;
+        
+        // 定位菜单
+        const syncButton = document.getElementById('sync-button');
+        const rect = syncButton.getBoundingClientRect();
+        syncMenu.style.top = `${rect.bottom}px`;
+        syncMenu.style.left = `${rect.left}px`;
+        
+        document.body.appendChild(syncMenu);
+        
+        // 添加点击事件
+        syncMenu.querySelector('.sync-now').addEventListener('click', () => {
+            document.body.removeChild(syncMenu);
+            syncToCloud();
+        });
+        
+        syncMenu.querySelector('.logout').addEventListener('click', () => {
+            document.body.removeChild(syncMenu);
+            logoutFromCloud();
+        });
+        
+        // 点击其他地方关闭菜单
+        document.addEventListener('click', function closeMenu(e) {
+            if (!syncMenu.contains(e.target) && e.target !== syncButton) {
+                if (document.body.contains(syncMenu)) {
+                    document.body.removeChild(syncMenu);
+                }
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    } else {
+        // 未登录，直接同步
+        syncToCloud();
+    }
+}
+
+// 检查认证状态
+function checkAuthState() {
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            // 用户已登录
+            currentUser = user;
+            isLoggedIn = true;
+            
+            // 更新UI
+            const syncButton = document.getElementById('sync-button');
+            syncButton.textContent = translations[language].loggedIn;
+            syncButton.classList.add('logged-in');
+            
+            // 设置实时同步
+            setupRealtimeSync();
+        }
+    });
+}
+
+// 设置自动同步
+function setupAutoSync() {
+    // 监听本地数据变化，自动同步到云端
+    const originalSaveTodos = saveTodos;
+    saveTodos = function() {
+        // 调用原始保存函数
+        originalSaveTodos();
+        
+        // 如果已登录，自动同步到云端
+        if (isLoggedIn && currentUser) {
+            // 使用防抖，避免频繁同步
+            clearTimeout(window.syncTimeout);
+            window.syncTimeout = setTimeout(() => {
+                const userDoc = doc(db, 'users', currentUser.uid);
+                setDoc(userDoc, { todos }).catch(error => {
+                    console.error('Auto sync error:', error);
+                });
+            }, 2000); // 2秒后同步
+        }
+    };
 }
 
 function updateLanguage() {
@@ -93,26 +204,212 @@ function updateLanguage() {
     document.querySelector('footer p').textContent = trans.footer;
 }
 
+// 全局变量，用于跟踪同步状态
+let isLoggedIn = false;
+let currentUser = null;
+let unsubscribeSnapshot = null;
+
+// 云同步功能
 async function syncToCloud() {
     try {
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        const userDoc = doc(db, 'users', user.uid);
-        await setDoc(userDoc, { todos });
-        alert('Synced successfully!');
-        // Listen for changes
-        onSnapshot(userDoc, (doc) => {
-            if (doc.exists()) {
-                todos = doc.data().todos || [];
-                saveTodos();
-                renderTodos();
-                updateItemsCount();
-            }
-        });
+        if (!isLoggedIn) {
+            // 用户未登录，进行登录
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            currentUser = result.user;
+            isLoggedIn = true;
+            
+            // 更新UI显示登录状态
+            const syncButton = document.getElementById('sync-button');
+            syncButton.textContent = translations[language].loggedIn;
+            syncButton.classList.add('logged-in');
+            
+            // 首次同步数据到云端
+            await syncData();
+            
+            // 设置实时监听
+            setupRealtimeSync();
+        } else {
+            // 用户已登录，手动触发同步
+            await syncData();
+        }
     } catch (error) {
         console.error('Sync error:', error);
-        alert('Sync failed: ' + error.message);
+        alert(translations[language].syncFailed + ': ' + error.message);
+    }
+}
+
+// 同步数据到云端
+async function syncData() {
+    try {
+        if (!currentUser) return;
+        
+        // 显示同步中状态
+        updateSyncStatus(translations[language].syncInProgress, 'syncing');
+        
+        const userDoc = doc(db, 'users', currentUser.uid);
+        
+        // 先获取云端数据
+        const docSnap = await getDoc(userDoc);
+        
+        if (docSnap.exists()) {
+            // 合并本地和云端数据
+            const cloudTodos = docSnap.data().todos || [];
+            mergeTodos(cloudTodos);
+        } else {
+            // 云端没有数据，直接上传本地数据
+            await setDoc(userDoc, { todos });
+        }
+        
+        // 显示同步成功消息
+        showSyncNotification(translations[language].syncSuccess);
+    } catch (error) {
+        console.error('Data sync error:', error);
+        showSyncNotification(translations[language].syncFailed + ': ' + error.message, true);
+    }
+}
+
+// 设置实时同步
+function setupRealtimeSync() {
+    if (!currentUser) return;
+    
+    // 如果已有监听，先取消
+    if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+    }
+    
+    const userDoc = doc(db, 'users', currentUser.uid);
+    
+    // 设置实时监听
+    unsubscribeSnapshot = onSnapshot(userDoc, (doc) => {
+        if (doc.exists()) {
+            const cloudTodos = doc.data().todos || [];
+            // 只有当云端数据与本地不同时才更新
+            if (JSON.stringify(cloudTodos) !== JSON.stringify(todos)) {
+                mergeTodos(cloudTodos, true);
+            }
+        }
+    }, (error) => {
+        console.error('Realtime sync error:', error);
+    });
+}
+
+// 合并本地和云端数据
+function mergeTodos(cloudTodos, isFromCloud = false) {
+    // 创建ID到todo的映射
+    const localTodosMap = {};
+    todos.forEach(todo => {
+        localTodosMap[todo.id] = todo;
+    });
+    
+    const cloudTodosMap = {};
+    cloudTodos.forEach(todo => {
+        cloudTodosMap[todo.id] = todo;
+    });
+    
+    // 合并策略：保留两边的所有项目，如有冲突则根据来源决定
+    const mergedTodos = [];
+    
+    // 处理所有ID
+    const allIds = new Set([...Object.keys(localTodosMap), ...Object.keys(cloudTodosMap)]);
+    
+    allIds.forEach(id => {
+        const localTodo = localTodosMap[id];
+        const cloudTodo = cloudTodosMap[id];
+        
+        if (localTodo && cloudTodo) {
+            // 两边都有，根据来源决定保留哪个
+            mergedTodos.push(isFromCloud ? cloudTodo : localTodo);
+        } else if (localTodo) {
+            // 只有本地有
+            mergedTodos.push(localTodo);
+        } else if (cloudTodo) {
+            // 只有云端有
+            mergedTodos.push(cloudTodo);
+        }
+    });
+    
+    // 更新本地数据
+    todos = mergedTodos;
+    saveTodos();
+    renderTodos();
+    updateItemsCount();
+    
+    // 如果是本地更新触发的合并，则更新云端数据
+    if (!isFromCloud && currentUser) {
+        const userDoc = doc(db, 'users', currentUser.uid);
+        setDoc(userDoc, { todos }).catch(error => {
+            console.error('Error updating cloud data:', error);
+        });
+    }
+}
+
+// 显示同步通知
+function showSyncNotification(message, isError = false) {
+    // 更新同步状态指示器
+    updateSyncStatus(message, isError ? 'error' : 'success');
+    
+    // 创建通知元素
+    const notification = document.createElement('div');
+    notification.className = `sync-notification ${isError ? 'error' : 'success'}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // 2秒后自动消失
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 500);
+    }, 2000);
+}
+
+// 更新同步状态指示器
+function updateSyncStatus(message, status = '') {
+    const syncStatus = document.getElementById('sync-status');
+    if (syncStatus) {
+        syncStatus.textContent = message;
+        syncStatus.className = '';
+        if (status) {
+            syncStatus.classList.add(status);
+        }
+        
+        // 3秒后清除状态
+        clearTimeout(window.statusTimeout);
+        window.statusTimeout = setTimeout(() => {
+            syncStatus.textContent = '';
+            syncStatus.className = '';
+        }, 3000);
+    }
+}
+
+// 登出功能
+async function logoutFromCloud() {
+    try {
+        if (isLoggedIn && auth) {
+            await auth.signOut();
+            isLoggedIn = false;
+            currentUser = null;
+            
+            // 取消实时监听
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
+            }
+            
+            // 更新UI
+            const syncButton = document.getElementById('sync-button');
+            syncButton.textContent = translations[language].syncToCloud;
+            syncButton.classList.remove('logged-in');
+            
+            showSyncNotification(translations[language].loggedOut);
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        alert(translations[language].logoutFailed + ': ' + error.message);
     }
 }
 
@@ -258,6 +555,40 @@ function startEditing(item) {
     const dueInput = item.querySelector('.todo-due');
     const prioritySelect = item.querySelector('.todo-priority');
     const tagsInput = item.querySelector('.todo-tags');
+    const actionsDiv = item.querySelector('.todo-actions');
+    
+    // 保存原始操作按钮的HTML
+    const originalActions = actionsDiv.innerHTML;
+    
+    // 添加保存按钮
+    actionsDiv.innerHTML = `
+        <button class="todo-save"><i class="fas fa-save"></i> 保存</button>
+        <button class="todo-cancel"><i class="fas fa-times"></i> 取消</button>
+    `;
+    
+    // 添加保存和取消按钮的事件监听器
+    const saveButton = actionsDiv.querySelector('.todo-save');
+    const cancelButton = actionsDiv.querySelector('.todo-cancel');
+    
+    saveButton.addEventListener('click', () => {
+        finishEditing(item);
+        // 恢复原始操作按钮
+        actionsDiv.innerHTML = originalActions;
+    });
+    
+    cancelButton.addEventListener('click', () => {
+        // 取消编辑，恢复原始状态
+        item.classList.remove('editing');
+        textInput.readOnly = true;
+        dueInput.style.display = 'none';
+        prioritySelect.style.display = 'none';
+        tagsInput.style.display = 'none';
+        // 恢复原始操作按钮
+        actionsDiv.innerHTML = originalActions;
+        // 重新渲染以恢复原始数据
+        renderTodos();
+    });
+    
     item.classList.add('editing');
     textInput.readOnly = false;
     dueInput.style.display = 'inline';
@@ -266,13 +597,9 @@ function startEditing(item) {
     textInput.focus();
     const length = textInput.value.length;
     textInput.setSelectionRange(length, length);
-    const finishEdit = () => finishEditing(item);
-    textInput.addEventListener('blur', finishEdit, { once: true });
-    dueInput.addEventListener('blur', finishEdit, { once: true });
-    prioritySelect.addEventListener('blur', finishEdit, { once: true });
-    tagsInput.addEventListener('blur', finishEdit, { once: true });
-    textInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') textInput.blur(); });
-    // Similar for others if needed
+    
+    // 移除blur事件监听器，改为使用保存按钮
+    textInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') saveButton.click(); });
 }
 function finishEditing(item) {
     const textInput = item.querySelector('.todo-text');
@@ -282,44 +609,30 @@ function finishEditing(item) {
     const displayDue = item.querySelector('.todo-display-due');
     const displayPriority = item.querySelector('.todo-display-priority');
     const displayTags = item.querySelector('.todo-display-tags');
+    
     item.classList.remove('editing');
     textInput.readOnly = true;
     dueInput.style.display = 'none';
     prioritySelect.style.display = 'none';
     tagsInput.style.display = 'none';
+    
     const id = item.dataset.id;
     const todo = todos.find(t => t.id === id);
     const newText = textInput.value.trim();
+    
     if (newText) {
+        // 保存编辑的内容
         todo.text = newText;
         todo.dueDate = dueInput.value;
         todo.priority = prioritySelect.value;
         todo.tags = tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag);
+        
+        // 更新显示
         displayDue.textContent = todo.dueDate ? new Date(todo.dueDate).toLocaleString() : '';
         displayPriority.textContent = todo.priority;
         displayPriority.className = `todo-display-priority ${todo.priority}`;
         displayTags.textContent = todo.tags.join(', ');
-        saveTodos();
-    } else {
-        todos = todos.filter(t => t.id !== id);
-        saveTodos();
-        renderTodos();
-        updateItemsCount();
-    }
-}
-
-// 完成编辑待办事项
-function finishEditing(item) {
-    const textInput = item.querySelector('.todo-text');
-    const id = item.dataset.id;
-    const todo = todos.find(t => t.id === id);
-    
-    item.classList.remove('editing');
-    textInput.readOnly = true;
-    
-    const newText = textInput.value.trim();
-    if (newText) {
-        todo.text = newText;
+        
         saveTodos();
     } else {
         // 如果文本为空，删除该待办事项
@@ -329,6 +642,8 @@ function finishEditing(item) {
         updateItemsCount();
     }
 }
+
+// 注意：此处不需要重复定义finishEditing函数，上面已经定义过了
 
 // 清除已完成的待办事项
 function clearCompleted() {

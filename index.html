@@ -31,6 +31,7 @@
                 <option value="en">English</option>
             </select>
             <button id="sync-button">同步到云端</button>
+            <div id="sync-status"></div>
         </div>
         
         <div class="filter-container">
@@ -57,9 +58,11 @@
     
     <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-    import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-    import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-    // Your Firebase config here
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+    import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    
+    // Firebase配置
+    // 注意：在实际使用时，您需要用您自己的Firebase项目配置替换这些值
     const firebaseConfig = {
         apiKey: 'YOUR_API_KEY',
         authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
@@ -68,9 +71,34 @@
         messagingSenderId: 'YOUR_SENDER_ID',
         appId: 'YOUR_APP_ID'
     };
+    
+    // 初始化Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    
+    // 启用离线持久化
+    enableIndexedDbPersistence(db)
+      .catch((err) => {
+          if (err.code == 'failed-precondition') {
+              // 多个标签页打开时可能会失败
+              console.warn('Persistence failed: Multiple tabs open');
+          } else if (err.code == 'unimplemented') {
+              // 当前浏览器不支持持久化
+              console.warn('Persistence is not available in this browser');
+          }
+      });
+      
+    // 将Firebase对象暴露给全局，以便app.js使用
+    window.auth = auth;
+    window.db = db;
+    window.GoogleAuthProvider = GoogleAuthProvider;
+    window.signInWithPopup = signInWithPopup;
+    window.doc = doc;
+    window.setDoc = setDoc;
+    window.getDoc = getDoc;
+    window.onSnapshot = onSnapshot;
+    window.signOut = signOut;
 </script>
 <script src="app.js"></script>
 </body>

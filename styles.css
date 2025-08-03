@@ -90,8 +90,42 @@ header h1 {
 .settings-container {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 10px 15px;
     border-top: 1px solid #e6e6e6;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#sync-status {
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+}
+
+#sync-status.syncing::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #ddd;
+    border-top-color: #667eea;
+    margin-right: 5px;
+    animation: spin 1s linear infinite;
+}
+
+#sync-status.success {
+    color: #4caf50;
+}
+
+#sync-status.error {
+    color: #ff6b6b;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 #dark-mode-toggle, #sync-button {
     background: #667eea;
@@ -100,6 +134,72 @@ header h1 {
     padding: 8px 12px;
     border-radius: 4px;
     cursor: pointer;
+    position: relative;
+}
+
+#sync-button.logged-in {
+    background: #4caf50;
+}
+
+/* 同步菜单样式 */
+.sync-menu {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 100;
+    min-width: 150px;
+}
+
+.sync-menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.sync-menu-item:hover {
+    background: #f5f5f5;
+}
+
+.sync-menu-item.logout {
+    border-top: 1px solid #eee;
+    color: #ff6b6b;
+}
+
+/* 同步通知样式 */
+.sync-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 15px;
+    border-radius: 4px;
+    color: white;
+    font-size: 14px;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+}
+
+.sync-notification.success {
+    background: #4caf50;
+}
+
+.sync-notification.error {
+    background: #ff6b6b;
+}
+
+.sync-notification.fade-out {
+    animation: fadeOut 0.5s ease-out forwards;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
 }
 #language-select {
     padding: 8px;
@@ -252,16 +352,20 @@ header h1 {
     gap: 5px;
 }
 
-.todo-edit, .todo-delete {
+.todo-edit, .todo-delete, .todo-save, .todo-cancel {
     background: none;
     border: none;
     cursor: pointer;
     opacity: 0.5;
     transition: opacity 0.3s;
+    padding: 5px 8px;
+    border-radius: 3px;
 }
 
 .todo-item:hover .todo-edit,
-.todo-item:hover .todo-delete {
+.todo-item:hover .todo-delete,
+.todo-save,
+.todo-cancel {
     opacity: 1;
 }
 
@@ -271,6 +375,16 @@ header h1 {
 
 .todo-delete {
     color: #ff6b6b;
+}
+
+.todo-save {
+    color: white;
+    background-color: #4caf50;
+}
+
+.todo-cancel {
+    color: white;
+    background-color: #ff6b6b;
 }
 
 /* 统计信息样式 */
