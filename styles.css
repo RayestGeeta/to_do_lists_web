@@ -1,0 +1,258 @@
+/* 基础样式设置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    color: #4a4a4a;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.container {
+    width: 100%;
+    max-width: 550px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+header {
+    background: linear-gradient(to right, #667eea, #764ba2);
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 24px;
+    font-weight: 300;
+}
+
+/* 表单样式 */
+.todo-form {
+    display: flex;
+    padding: 15px;
+    border-bottom: 1px solid #e6e6e6;
+}
+
+#todo-input {
+    flex: 1;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+#todo-input:focus {
+    border-color: #667eea;
+}
+
+#add-button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0 15px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+#add-button:hover {
+    background: #5a6fe0;
+}
+
+/* 过滤器样式 */
+.filter-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #e6e6e6;
+    font-size: 14px;
+}
+
+.filters {
+    display: flex;
+    gap: 10px;
+}
+
+.filter {
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 3px;
+    transition: all 0.3s;
+}
+
+.filter:hover {
+    background-color: #f1f1f1;
+}
+
+.filter.active {
+    background-color: #667eea;
+    color: white;
+}
+
+#clear-completed {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    transition: color 0.3s;
+}
+
+#clear-completed:hover {
+    color: #ff6b6b;
+}
+
+/* 待办事项列表样式 */
+#todo-list {
+    list-style-type: none;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e6e6e6;
+    transition: background 0.2s;
+}
+
+.todo-item:hover {
+    background-color: #f9f9f9;
+}
+
+.todo-item.completed {
+    color: #d9d9d9;
+    text-decoration: line-through;
+}
+
+.todo-item.editing {
+    background-color: #fffde7;
+}
+
+.todo-checkbox {
+    margin-right: 10px;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.todo-checkbox:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+.todo-checkbox:checked::after {
+    content: '\2713';
+    position: absolute;
+    color: white;
+    font-size: 14px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.todo-text {
+    flex: 1;
+    font-size: 16px;
+    padding: 5px 0;
+    border: none;
+    background: transparent;
+    outline: none;
+}
+
+.todo-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.todo-edit, .todo-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+}
+
+.todo-item:hover .todo-edit,
+.todo-item:hover .todo-delete {
+    opacity: 1;
+}
+
+.todo-edit {
+    color: #667eea;
+}
+
+.todo-delete {
+    color: #ff6b6b;
+}
+
+/* 统计信息样式 */
+.todo-stats {
+    padding: 15px;
+    text-align: left;
+    color: #888;
+    font-size: 14px;
+}
+
+/* 页脚样式 */
+footer {
+    margin-top: 20px;
+    color: #888;
+    font-size: 14px;
+    text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 600px) {
+    .container {
+        width: 95%;
+    }
+    
+    .filter-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .filters {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+/* 拖拽样式 */
+.todo-item.dragging {
+    opacity: 0.5;
+    background-color: #f0f8ff;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.todo-item {
+    animation: fadeIn 0.3s ease-out;
+}
